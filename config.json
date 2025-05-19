@@ -50,7 +50,8 @@
         "image_save_path": "./images/",
         "image_retention_hours": 24,
         "usb_vendor_id": "",
-        "usb_product_id": ""
+        "usb_product_id": "",
+        "skip_usb_check": false
     },
     "SERIAL_CONFIG": {
       "enabled": false,

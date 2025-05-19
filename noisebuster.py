@@ -103,6 +103,9 @@ usb_product_id_str = DEVICE_AND_NOISE_MONITORING_CONFIG.get("usb_product_id", ""
 usb_vendor_id_int = int(usb_vendor_id_str, 16) if usb_vendor_id_str else None
 usb_product_id_int = int(usb_product_id_str, 16) if usb_product_id_str else None
 
+# Add this after extracting DEVICE_AND_NOISE_MONITORING_CONFIG:
+skip_usb_check = DEVICE_AND_NOISE_MONITORING_CONFIG.get("skip_usb_check", False)
+
 ####################################
 # LOGGING CONFIGURATION
 ####################################
@@ -326,6 +329,9 @@ check_configuration()
 device_detected = False
 
 def detect_usb_device(verbose=True):
+    if skip_usb_check:
+        logger.info("USB device check skipped due to configuration.")
+        return None
     global device_detected
     devs = usb.core.find(find_all=True)
     for dev in devs:
