@@ -892,38 +892,31 @@ def notify_on_start():
 ####################################
 def main():
     # Quick config checks
-    if skip_usb_check:
+    if skip_usb_check and not use_serial_device:
+        logger.warning("Both USB and Serial device checks are disabled in config. Will wait for a device to appear.")
+    elif skip_usb_check and use_serial_device:
         logger.info("USB sound meter check and usage skipped due to configuration.")
-        dev_check = None
-        if use_serial_device:
-            s = detect_serial_device(verbose=False)
-            if not s:
-                logger.error("Serial device not found and USB check is skipped. Exiting.")
-                sys.exit(1)
-            else:
-                logger.info("Starting Noise Monitoring on Serial device.")
+        s = detect_serial_device(verbose=False)
+        if not s:
+            logger.warning("Serial device not found. Will wait for a device to appear.")
         else:
-            logger.error("Both USB and Serial device checks are disabled. Exiting.")
-            sys.exit(1)
-    else:
-        dev_check = None
-        if use_serial_device:
-            s = detect_serial_device(verbose=False)
-            if not s:
-                logger.warning("Serial device not found - fallback to USB.")
-                dev_check = detect_usb_device(verbose=False)
-                if not dev_check:
-                    logger.error("No USB device found either. Exiting.")
-                    sys.exit(1)
-                else:
-                    logger.info("We'll use USB fallback.")
-            else:
-                logger.info("Starting Noise Monitoring on Serial device.")
-        else:
+            logger.info("Starting Noise Monitoring on Serial device.")
+    elif not skip_usb_check and use_serial_device:
+        s = detect_serial_device(verbose=False)
+        if not s:
+            logger.warning("Serial device not found - fallback to USB.")
             dev_check = detect_usb_device(verbose=False)
             if not dev_check:
-                logger.error("No USB sound meter found, serial disabled. Exiting.")
-                sys.exit(1)
+                logger.warning("No USB device found either. Will wait for a device to appear.")
+            else:
+                logger.info("We'll use USB fallback.")
+        else:
+            logger.info("Starting Noise Monitoring on Serial device.")
+    else:
+        dev_check = detect_usb_device(verbose=False)
+        if not dev_check:
+            logger.warning("No USB sound meter found, serial disabled. Will wait for a device to appear.")
+        else:
             logger.info("Starting Noise Monitoring on USB device.")
 
     # Possibly send a Pushover on start
