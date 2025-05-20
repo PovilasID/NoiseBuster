@@ -626,25 +626,27 @@ def update_noise_level():
     peak_weather_description = ""
     peak_precipitation_float = 0.0
 
-    # Attempt to open Serial if enabled
     ser_dev = None
     usb_dev = None
-    if use_serial_device:
-        ser_dev = detect_serial_device(verbose=True)
-        if not ser_dev:
-            logger.warning("Serial device not found - falling back to USB.")
-            usb_dev = detect_usb_device(verbose=True)
-            if not usb_dev:
-                logger.error("No USB fallback device found. Exiting.")
-                sys.exit(1)
+
+    # Wait for a device to become available
+    while True:
+        if use_serial_device:
+            ser_dev = detect_serial_device(verbose=True)
+            if ser_dev:
+                logger.info("Noise monitoring on Serial device.")
+                break
+            else:
+                logger.info("Waiting for Serial device...")
         else:
-            logger.info("Noise monitoring on Serial device.")
-    else:
-        usb_dev = detect_usb_device(verbose=True)
-        if not usb_dev:
-            logger.error("No USB device found (Serial is disabled). Exiting.")
-            sys.exit(1)
-        logger.info("Noise monitoring on USB device.")
+            usb_dev = detect_usb_device(verbose=True)
+            if usb_dev:
+                logger.info("Noise monitoring on USB device.")
+                break
+            else:
+                logger.info("Waiting for USB device...")
+
+        time.sleep(2)  # Wait before retrying
 
     while True:
         current_time = time.time()
