@@ -402,7 +402,7 @@ def detect_rtsp_audio(verbose=True):
     if av is None:
         logger.error("PyAV not installed. Can't use RTSP audio.")
         return None
-    rtsp_url = CAMERA_CONFIG.get("rtsp_url")
+    rtsp_url = CAMERA_CONFIG.get("ip_camera_url")
     if not rtsp_url:
         logger.error("No RTSP URL configured.")
         return None
