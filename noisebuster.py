@@ -418,6 +418,7 @@ def detect_rtsp_audio(verbose=True):
     except Exception as e:
         logger.error(f"Failed to open RTSP audio stream: {str(e)}")
         return None
+calibration_offset_db = CAMERA_CONFIG.get("calibration_offset_db", 90)    
 
 ####################################
 # INFLUXDB
@@ -771,7 +772,7 @@ def update_noise_level():
                         # Calculate RMS or peak dB
                         import numpy as np
                         rms = np.sqrt(np.mean(samples.astype(np.float32) ** 2))
-                        dB = 20 * np.log10(rms + 1e-6) + 90  # Offset for typical mic
+                        dB = 20 * np.log10(rms + 1e-6) + calibration_offset_db  # Use calibration variable
                         dB = round(dB, 1)
                         if dB > current_peak_dB:
                             current_peak_dB = dB
