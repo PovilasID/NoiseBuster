@@ -34,6 +34,7 @@
         "use_ip_camera": false,
         "use_pi_camera": false,
         "ip_camera_url": "",
+        "use_rtsp_audio": false,
         "ip_camera_protocol": "rtsp",
         "rotation": 0,
         "hflip": false,

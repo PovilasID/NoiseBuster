@@ -65,6 +65,11 @@ mqtt = None
 cv2 = None
 np = None
 
+try:
+    import av
+except ImportError:
+    av = None
+
 # Load config from config.json
 def load_config(config_path):
     with open(config_path, 'r') as config_file:
@@ -391,6 +396,29 @@ def detect_serial_device(verbose=True):
         logger.error(f"Unexpected error opening serial port {port}: {str(e)}")
         return None
 
+def detect_rtsp_audio(verbose=True):
+    if not CAMERA_CONFIG.get("use_rtsp_audio"):
+        return None
+    if av is None:
+        logger.error("PyAV not installed. Can't use RTSP audio.")
+        return None
+    rtsp_url = CAMERA_CONFIG.get("rtsp_url")
+    if not rtsp_url:
+        logger.error("No RTSP URL configured.")
+        return None
+    try:
+        container = av.open(rtsp_url)
+        audio_stream = next((s for s in container.streams if s.type == 'audio'), None)
+        if not audio_stream:
+            logger.error("No audio stream found in RTSP source.")
+            return None
+        if verbose:
+            logger.info(f"Connected to RTSP audio stream: {rtsp_url}")
+        return container, audio_stream
+    except Exception as e:
+        logger.error(f"Failed to open RTSP audio stream: {str(e)}")
+        return None
+
 ####################################
 # INFLUXDB
 ####################################
@@ -628,10 +656,18 @@ def update_noise_level():
 
     ser_dev = None
     usb_dev = None
+    rtsp_audio = None
 
     # Wait for a device to become available
     while True:
-        if use_serial_device:
+        if CAMERA_CONFIG.get("use_rtsp_audio"):
+            rtsp_audio = detect_rtsp_audio(verbose=True)
+            if rtsp_audio:
+                logger.info("Noise monitoring on RTSP audio source.")
+                break
+            else:
+                logger.info("Waiting for RTSP audio source...")
+        elif use_serial_device:
             ser_dev = detect_serial_device(verbose=True)
             if ser_dev:
                 logger.info("Noise monitoring on Serial device.")
@@ -645,7 +681,6 @@ def update_noise_level():
                 break
             else:
                 logger.info("Waiting for USB device...")
-
         time.sleep(2)  # Wait before retrying
 
     while True:
@@ -727,7 +762,25 @@ def update_noise_level():
 
         # Reading from device
         try:
-            if ser_dev:
+            if rtsp_audio:
+                container, audio_stream = rtsp_audio
+                for packet in container.demux(audio_stream):
+                    for frame in packet.decode():
+                        # frame.planes[0] is the audio data
+                        samples = frame.to_ndarray()
+                        # Calculate RMS or peak dB
+                        import numpy as np
+                        rms = np.sqrt(np.mean(samples.astype(np.float32) ** 2))
+                        dB = 20 * np.log10(rms + 1e-6) + 90  # Offset for typical mic
+                        dB = round(dB, 1)
+                        if dB > current_peak_dB:
+                            current_peak_dB = dB
+                            if WEATHER_CONFIG.get("enabled"):
+                                peak_temperature, peak_weather_description, p = get_weather()
+                                peak_precipitation_float = float(p)
+                        break  # Only process one frame per loop
+                    break
+            elif ser_dev:
                 line = ser_dev.readline().decode().strip()
                 if line:
                     dB = float(line)
@@ -746,7 +799,7 @@ def update_noise_level():
                         peak_temperature, peak_weather_description, p = get_weather()
                         peak_precipitation_float = float(p)
             else:
-                logger.error("No device found (neither USB nor Serial). Breaking loop.")
+                logger.error("No device found (neither USB, Serial, nor RTSP). Breaking loop.")
                 break
         except usb.core.USBError as usb_err:
             logger.error(f"USB Error reading: {str(usb_err)}")
@@ -924,6 +977,9 @@ def main():
         send_pushover_notification("Noise Buster has started monitoring.")
 
     notify_on_start()
+
+    if CAMERA_CONFIG.get("use_rtsp_audio"):
+        logger.info("Configured to use RTSP audio as noise source.")
 
     # Start noise monitoring in separate thread
     noise_thread = threading.Thread(target=update_noise_level)
